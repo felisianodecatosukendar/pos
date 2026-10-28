@@ -1,69 +1,27 @@
-import Image from "next/image";
-
-export default function Home() {
-  return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+'use client';
+import {useEffect,useState} from 'react';
+import {supabase} from './lib/supabase';
+import type {Session} from '@supabase/supabase-js';
+type Product={id:string;sku:string;name:string;price:number;stock:number;category:string;variant:string;active:boolean};
+type Sale={receipt_number:string;total:number;payment_method:string;created_at:string};
+const rupiah=(n:number)=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(n);
+export default function Home(){
+ const [session,setSession]=useState<Session|null>(null),[loading,setLoading]=useState(true),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[role,setRole]=useState(''),[products,setProducts]=useState<Product[]>([]),[sales,setSales]=useState<Sale[]>([]),[cart,setCart]=useState<Record<string,number>>({}),[tab,setTab]=useState('kasir'),[search,setSearch]=useState(''),[method,setMethod]=useState('cash'),[cash,setCash]=useState(''),[discount,setDiscount]=useState('0'),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[form,setForm]=useState({sku:'',name:'',category:'Daster',variant:'',price:'',stock:'0'}),[edit,setEdit]=useState<string|null>(null);
+ async function refresh(){if(!supabase)return;const [p,s]=await Promise.all([supabase.from('products').select('*').order('name'),supabase.from('sales').select('receipt_number,total,payment_method,created_at').order('created_at',{ascending:false}).limit(200)]);if(p.error)setMessage(p.error.message);else setProducts(p.data||[]);if(s.error)setMessage(s.error.message);else setSales(s.data||[]);}
+ useEffect(()=>{if(!supabase){setLoading(false);return;}const c=supabase;c.auth.getSession().then(({data})=>{setSession(data.session);setLoading(false)});const {data:{subscription}}=c.auth.onAuthStateChange((_e,s)=>setSession(s));return()=>subscription.unsubscribe()},[]);
+ useEffect(()=>{if(!supabase||!session){setRole('');return;}supabase.from('profiles').select('role,active').eq('id',session.user.id).single().then(({data,error})=>{if(error)setMessage(error.message);setRole(data?.active?data.role:'inactive')});refresh()},[session]);
+ const selected=products.filter(p=>cart[p.id]>0),subtotal=selected.reduce((n,p)=>n+p.price*cart[p.id],0),total=subtotal-(Number(discount)||0);
+ const change=(p:Product,n:number)=>setCart(c=>({...c,[p.id]:Math.min(p.stock,Math.max(0,(c[p.id]||0)+n))}));
+ async function login(e:React.FormEvent){e.preventDefault();if(!supabase)return;setBusy(true);const {error}=await supabase.auth.signInWithPassword({email,password});setBusy(false);if(error)setMessage(error.message);}
+ async function checkout(){if(!supabase||busy)return;setBusy(true);const {data,error}=await supabase.rpc('checkout',{p_items:selected.map(p=>({product_id:p.id,quantity:cart[p.id]})),p_method:method,p_cash:method==='cash'?Number(cash):total,p_discount:Number(discount)||0});setBusy(false);if(error)setMessage(error.message);else{setMessage('Transaksi berhasil: '+data.receipt_number);setCart({});setCash('');await refresh();}}
+ async function save(e:React.FormEvent){e.preventDefault();if(!supabase||role!=='admin')return;setBusy(true);const data={...form,price:Number(form.price),stock:Number(form.stock)};const r=edit?await supabase.from('products').update(data).eq('id',edit):await supabase.from('products').insert(data);setBusy(false);if(r.error)setMessage(r.error.message);else{setMessage('Produk tersimpan');setEdit(null);setForm({sku:'',name:'',category:'Daster',variant:'',price:'',stock:'0'});await refresh();}}
+ function exportCsv(){const rows=[['Struk','Tanggal','Metode','Total'],...sales.map(s=>[s.receipt_number,s.created_at,s.payment_method,String(s.total)])];const csv='\ufeff'+rows.map(r=>r.map(v=>'"'+v.replaceAll('"','""')+'"').join(',')).join('\r\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='penjualan-piyamacx.csv';a.click();URL.revokeObjectURL(a.href);}
+ if(!supabase)return <main className="p-8">Supabase belum dikonfigurasi di Vercel.</main>;
+ if(loading)return <main className="p-8">Memuat POS...</main>;
+ if(!session)return <main className="min-h-screen flex items-center justify-center p-4 bg-rose-50"><form onSubmit={login} className="card bg-white shadow-xl w-full max-w-sm"><div className="card-body gap-4"><h1 className="text-3xl font-bold text-rose-900">piyamacx</h1><p>POS · Kasir & Stok</p><input className="input input-bordered w-full" type="email" placeholder="Email" required value={email} onChange={e=>setEmail(e.target.value)}/><input className="input input-bordered w-full" type="password" placeholder="Password" required value={password} onChange={e=>setPassword(e.target.value)}/>{message&&<p className="text-error text-sm">{message}</p>}<button className="btn btn-primary" disabled={busy}>Masuk</button></div></form></main>;
+ if(role==='inactive')return <main className="p-8">Akun belum aktif. Hubungi admin. <button className="btn" onClick={()=>supabase.auth.signOut()}>Keluar</button></main>;
+ return <main className="min-h-screen bg-rose-50"><header className="bg-white p-4 flex justify-between"><div><h1 className="text-2xl font-bold text-rose-900">piyamacx POS</h1><p className="text-xs">{session.user.email} · {role}</p></div><button className="btn btn-sm" onClick={()=>supabase.auth.signOut()}>Keluar</button></header><div className="max-w-6xl mx-auto p-4"><nav className="flex gap-2 mb-4">{['kasir',...(role==='admin'?['produk']:[]),'laporan'].map(t=><button key={t} className={'btn btn-sm '+(tab===t?'btn-primary':'')} onClick={()=>setTab(t)}>{t.toUpperCase()}</button>)}</nav>{message&&<div className="alert mb-4">{message}<button className="btn btn-xs" onClick={()=>setMessage('')}>Tutup</button></div>}
+ {tab==='kasir'&&<div className="grid lg:grid-cols-[1fr_340px] gap-4"><section><input className="input input-bordered w-full mb-3" placeholder="Cari produk / SKU" value={search} onChange={e=>setSearch(e.target.value)}/><div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">{products.filter(p=>p.active&&(p.name+' '+p.sku).toLowerCase().includes(search.toLowerCase())).map(p=><article className="card bg-white" key={p.id}><div className="card-body p-4"><span className="text-xs opacity-60">{p.sku} · {p.category}</span><h3 className="font-semibold">{p.name} {p.variant}</h3><b className="text-rose-900">{rupiah(p.price)}</b><div className="flex items-center justify-between"><span className="text-xs">Stok {p.stock}</span><div className="join"><button className="btn btn-sm join-item" disabled={!cart[p.id]} onClick={()=>change(p,-1)}>−</button><span className="btn btn-sm join-item">{cart[p.id]||0}</span><button className="btn btn-sm join-item" disabled={(cart[p.id]||0)>=p.stock} onClick={()=>change(p,1)}>+</button></div></div></div></article>)}</div></section><aside className="card bg-white h-fit"><div className="card-body p-4"><h2 className="font-bold text-xl">Keranjang</h2>{selected.map(p=><div className="flex justify-between border-b py-2 text-sm" key={p.id}><span>{p.name} × {cart[p.id]}</span><b>{rupiah(p.price*cart[p.id])}</b></div>)}<p>Subtotal: {rupiah(subtotal)}</p><label>Diskon<input className="input input-bordered w-full" type="number" min="0" value={discount} onChange={e=>setDiscount(e.target.value)}/></label><h3 className="text-xl font-bold">Total: {rupiah(total)}</h3><select className="select select-bordered w-full" value={method} onChange={e=>setMethod(e.target.value)}><option value="cash">Tunai</option><option value="qris">QRIS</option><option value="transfer">Transfer</option></select>{method==='cash'&&<label>Uang diterima<input className="input input-bordered w-full" type="number" min="0" value={cash} onChange={e=>setCash(e.target.value)}/>Kembalian: {rupiah(Math.max(0,Number(cash)-total))}</label>}<button className="btn btn-primary" disabled={busy||!selected.length||total<0||(method==='cash'&&Number(cash)<total)} onClick={checkout}>Selesaikan Transaksi</button></div></aside></div>}
+ {tab==='produk'&&role==='admin'&&<div className="grid lg:grid-cols-[320px_1fr] gap-4"><form onSubmit={save} className="card bg-white"><div className="card-body p-4"><h2 className="font-bold">{edit?'Edit':'Tambah'} Produk</h2>{(['sku','name','category','variant','price','stock'] as const).map(k=><label key={k} className="capitalize">{k}<input className="input input-bordered w-full" required={k!=='variant'} type={['price','stock'].includes(k)?'number':'text'} min={['price','stock'].includes(k)?0:undefined} value={form[k]} onChange={e=>setForm(v=>({...v,[k]:e.target.value}))}/></label>)}<button className="btn btn-primary">Simpan</button></div></form><div className="card bg-white"><div className="card-body p-4"><h2 className="font-bold">Produk & Stok</h2><div className="overflow-x-auto"><table className="table"><thead><tr><th>Produk</th><th>SKU</th><th>Harga</th><th>Stok</th><th></th></tr></thead><tbody>{products.map(p=><tr key={p.id}><td>{p.name}</td><td>{p.sku}</td><td>{rupiah(p.price)}</td><td>{p.stock}</td><td><button className="btn btn-xs" onClick={()=>{setEdit(p.id);setForm({sku:p.sku,name:p.name,category:p.category,variant:p.variant,price:String(p.price),stock:String(p.stock)})}}>Edit</button></td></tr>)}</tbody></table></div></div></div></div>}
+ {tab==='laporan'&&<div className="card bg-white"><div className="card-body p-4"><div className="flex justify-between"><h2 className="font-bold text-xl">Riwayat</h2><button className="btn btn-sm" onClick={exportCsv}>CSV</button></div><p>Total dari {sales.length} transaksi terbaru: {rupiah(sales.reduce((n,s)=>n+Number(s.total),0))}</p><div className="overflow-x-auto"><table className="table"><thead><tr><th>Struk</th><th>Tanggal</th><th>Metode</th><th>Total</th></tr></thead><tbody>{sales.map(s=><tr key={s.receipt_number}><td>{s.receipt_number}</td><td>{new Date(s.created_at).toLocaleString('id-ID')}</td><td>{s.payment_method}</td><td>{rupiah(Number(s.total))}</td></tr>)}</tbody></table></div></div></div>}</div></main>;
 }
