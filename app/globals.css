@@ -12,6 +12,27 @@ body { font-family: Arial, Helvetica, sans-serif; }
 .btn-primary { background-color: #862d51; border-color: #862d51; color: #fff; }
 .btn-primary:hover { background-color: #69203e; border-color: #69203e; }
 
+
+/* Mobile-first POS layout: keep the viewport stable even with wide receipts/tables. */
+html, body { width: 100%; min-width: 0; max-width: 100%; overflow-x: clip; }
+body, main, main > div, section, aside, .card, .card-body { min-width: 0; }
+.card-body { max-width: 100%; }
+.stat { min-width: 0; padding: clamp(0.65rem, 2.5vw, 1.25rem); }
+.stat-value { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.stat-title, .stat-desc, .card-title { white-space: normal; overflow-wrap: anywhere; }
+.overflow-x-auto { max-width: 100%; min-width: 0; overscroll-behavior-x: contain; }
+.overflow-x-auto > table { width: max-content; min-width: 100%; }
+.input, .select, .textarea { max-width: 100%; min-width: 0; }
+.alert { min-width: 0; flex-wrap: wrap; overflow-wrap: anywhere; }
+@media (max-width: 639px) {
+ .card-body { padding: 0.9rem; }
+ .table { font-size: 0.75rem; }
+ .table :where(th,td) { padding: 0.55rem 0.65rem; }
+ .stat-value { font-size: 1.15rem; line-height: 1.4; }
+ .btn { min-height: 2.4rem; }
+ .receipt-paper { width: 58mm; }
+}
+
 .receipt-paper { width: 58mm; max-width: 100%; font-family: Arial, sans-serif; color: #000; background: #fff; }
 @media print {
  @page { size: 58mm auto; margin: 2mm; }
