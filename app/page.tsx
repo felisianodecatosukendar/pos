@@ -1,6 +1,6 @@
 'use client';
 import {useEffect,useState} from 'react';
-import {supabase} from './lib/supabase';
+import {supabase} from '../src/lib/supabase/client';
 import type {Session} from '@supabase/supabase-js';
 type Product={id:string;sku:string;name:string;price:number;stock:number;category:string;variant:string;active:boolean};
 type Sale={receipt_number:string;total:number;payment_method:string;created_at:string};
