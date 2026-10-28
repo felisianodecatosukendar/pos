@@ -11,3 +11,14 @@ body { font-family: Arial, Helvetica, sans-serif; }
 .table thead, .stat-title { color: #514650; }
 .btn-primary { background-color: #862d51; border-color: #862d51; color: #fff; }
 .btn-primary:hover { background-color: #69203e; border-color: #69203e; }
+
+.receipt-paper { width: 58mm; max-width: 100%; font-family: Arial, sans-serif; color: #000; background: #fff; }
+@media print {
+ @page { size: 58mm auto; margin: 2mm; }
+ html,body { background: #fff !important; color: #000 !important; }
+ body * { visibility: hidden !important; }
+ #receipt-print, #receipt-print * { visibility: visible !important; }
+ #receipt-print { position: absolute !important; left: 0 !important; top: 0 !important; width: 54mm !important; margin: 0 !important; padding: 0 !important; font-size: 11px !important; }
+ .print-overlay { position: static !important; background: transparent !important; padding: 0 !important; }
+ .print-hide { display: none !important; }
+}
